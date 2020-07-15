@@ -10,8 +10,7 @@ from itertools import cycle
 
 env = Env()
 env.read_env()
-token_bot = env("TOKEN")
-token = str(token_bot)
+TOKEN = str(env("TOKEN"))
 
 
 
@@ -125,5 +124,5 @@ if __name__ == "__main__": # SI c'est ce fichier qui est lancé seulement !
                   botinfo, serverinfo, userinfo]:
     bot.add_command(command)
 
-  bot.run(token, reconnect=True)
+  bot.run(TOKEN, reconnect=True)
   
