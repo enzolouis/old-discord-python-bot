@@ -120,9 +120,33 @@ if __name__ == "__main__": # SI c'est ce fichier qui est lancé seulement !
   from command.information.serverinfo import serverinfo
   from command.information.userinfo import userinfo
 
-  for command in [ball8, bingo, cat, dog, roll, color, find, lmgtfy, ping, qrcode, say, timer,
-                  botinfo, serverinfo, userinfo]:
+  from command.moderation.ban import ban, unban
+  from command.moderation.channel_create import create_channel
+  from command.moderation.channel_delete import delete_channel
+  from command.moderation.clear import clear
+  from command.moderation.kick import kick
+  from command.moderation.lock import lock, unlock
+  from command.moderation.mute import mute, unmute
+  from command.moderation.nickbot import nickbot
+  from command.moderation.rename import rename
+  from command.moderation.rename_prefix import rename_prefix
+  from command.moderation.role_add import addrole
+  from command.moderation.role_create import create_role
+  from command.moderation.role_delete import delete_role
+  from command.moderation.role_remove import removerole
+  from command.moderation.slowmode import slowmode
+
+  for command in [
+    ball8, bingo, cat, dog, roll, 
+    color, find, lmgtfy, ping, qrcode, say, timer,
+    botinfo, serverinfo, userinfo,
+    ban, unban, create_channel, delete_channel, clear, kick, lock, unlock, mute, unmute, nickbot, rename,
+    rename_prefix, addrole, create_role, delete_role, removerole, slowmode]:
+    
     bot.add_command(command)
+
+  for extension in ['command.modules.ticket', 'command.modules.warn', 'command.modules.blacklist']:
+    bot.load_extension(extension)
 
   bot.run(TOKEN, reconnect=True)
   
