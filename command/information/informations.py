@@ -138,7 +138,6 @@ class Informations(commands.Cog):
         embed.add_field(name="➔ URL", value=invite.url)
         embed.add_field(name="➔ Max age", value=invite.max_age)
         embed.add_field(name="➔ Max uses", value=invite.max_uses)
-        #embed.add_field(name="➔ Uses", value=invite.uses)
         embed.set_footer(text=ctx.author.name, icon_url=ctx.author.avatar_url)
 
         await ctx.send(embed=embed)
