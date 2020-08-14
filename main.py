@@ -26,7 +26,7 @@ async def _prefix(bot, message):
         # en MP, préfix par défaut !
         return default_prefix
 
-    
+
 # Initialisation du bot
 bot = commands.Bot(command_prefix=_prefix) # 3 shard (0, 1, 2)
 bot.remove_command("help")
