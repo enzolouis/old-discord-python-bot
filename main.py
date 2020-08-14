@@ -1,16 +1,16 @@
 import asyncio
 import sqlite3
+import os
 import discord
 
 from discord.ext import commands, tasks
-from environs import Env
 from itertools import cycle
+from dotenv import load_dotenv
 
+# load .env file environnment
+load_dotenv()
 
-
-env = Env()
-env.read_env()
-TOKEN = str(env("TOKEN"))
+TOKEN = os.environ["TOKEN"]
 
 
 custom_prefixes = {}
