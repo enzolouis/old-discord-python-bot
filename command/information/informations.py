@@ -110,6 +110,7 @@ class Informations(commands.Cog):
         await ctx.send(embed=embed)
 
 
+
     @commands.command(aliases=["emoji-info"])
     async def emojiinfo(self, ctx, emoji:discord.Emoji):
       embed = discord.Embed(title="Emoji informations", color=0x0000bf, timestamp=datetime.utcnow())
@@ -124,6 +125,7 @@ class Informations(commands.Cog):
       embed.set_footer(text=ctx.author.name, icon_url=ctx.author.avatar_url)
       
       await ctx.send(embed=embed)
+
 
 
     @commands.command(aliases=["invite-info"])
