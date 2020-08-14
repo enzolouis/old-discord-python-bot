@@ -12,9 +12,11 @@ from ..error import GOOD_USE, ERROR_PERMISSIONS_BOT, ERROR_PUNISHMENTS, ERROR, C
 class Warn(commands.Cog):
   
   
-  def __init__(self, bot):
+  def __init__(self, bot, con, cursor):
     self.bot = bot
-    self.DB = r'C:\Users\Enzo\Documents\PythonProjects\Exarium\data\data.db'
+    self.con = con
+    self.cursor = cursor
+    #self.DB = r'C:\Users\Enzo\Documents\PythonProjects\Exarium\data\data.db'
     
   
   # function to check if author role <= member.role
@@ -50,8 +52,6 @@ Let's go !""")
       
       await ctx.send("Well done !", delete_after=2)
       
-      con = sqlite3.connect(self.DB)
-      cursor = con.cursor()
       
       guild_id = ctx.guild.id
       mute_warn = int(mute_warn.content)
@@ -65,15 +65,15 @@ Let's go !""")
       
       await ctx.send(embed=embed)
       
-      cursor.execute("SELECT * FROM ABC_sanctions_warn")
-      cursor.execute("SELECT * FROM ABC_sanctions_warn WHERE guild_id = ?", (guild_id, ))
+      self.cursor.execute("SELECT * FROM ABC_sanctions_warn")
+      self.cursor.execute("SELECT * FROM ABC_sanctions_warn WHERE guild_id = ?", (guild_id, ))
       
-      result = cursor.fetchone()
+      result = self.cursor.fetchone()
       if result is None:
-        cursor.execute("INSERT INTO ABC_sanctions_warn VALUES(?, ?, ?, ?)", (guild_id, mute_warn, kick_warn, ban_warn))
+        self.cursor.execute("INSERT INTO ABC_sanctions_warn VALUES(?, ?, ?, ?)", (guild_id, mute_warn, kick_warn, ban_warn))
       else:
-        cursor.execute("UPDATE ABC_sanctions_warn SET mute = ?, kick = ?, ban = ? WHERE guild_id = ?", (mute_warn, kick_warn, ban_warn, guild_id))
-      con.commit()
+        self.cursor.execute("UPDATE ABC_sanctions_warn SET mute = ?, kick = ?, ban = ? WHERE guild_id = ?", (mute_warn, kick_warn, ban_warn, guild_id))
+      self.con.commit()
 
       
   @commands.has_permissions(manage_messages=True)
@@ -82,26 +82,24 @@ Let's go !""")
       if not await Warn.check_role(ctx, member, "warn"): return
       
       try:
-          con = sqlite3.connect(self.DB)
-          cursor = con.cursor()
           user_id = member.id
           guild_id = ctx.guild.id
 
-          cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
-          result = cursor.fetchone()
+          self.cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
+          result = self.cursor.fetchone()
           
           # ajouter les warns
           if result is None:
-              cursor.execute("INSERT INTO ABC_warn VALUES(?, ?, ?, ?, ?, ?)", (guild_id, user_id, 1, 0, 0, 0)) # ajouter un premier warn
+              self.cursor.execute("INSERT INTO ABC_warn VALUES(?, ?, ?, ?, ?, ?)", (guild_id, user_id, 1, 0, 0, 0)) # ajouter un premier warn
           else:
-              cursor.execute("UPDATE ABC_warn SET warn = ? WHERE guild_id = ? AND user_id = ?", (result[2]+1, guild_id, user_id)) # ajouter d'autre warn
+              self.cursor.execute("UPDATE ABC_warn SET warn = ? WHERE guild_id = ? AND user_id = ?", (result[2]+1, guild_id, user_id)) # ajouter d'autre warn
 
           # requête pour trouver le nombre de warn nécessaire au mute/kick/ban
-          cursor.execute("SELECT mute, kick, ban FROM ABC_sanctions_warn WHERE guild_id = ?", (guild_id, ))
-          result_sanctions = cursor.fetchone()
+          self.cursor.execute("SELECT mute, kick, ban FROM ABC_sanctions_warn WHERE guild_id = ?", (guild_id, ))
+          result_sanctions = self.cursor.fetchone()
           # requête pour trouver le nombre de warn de l'utlisateur. Et son nombre de mute/kick/ban provoqué par le nombre de warn
-          cursor.execute("SELECT warn, mute_with_warn, kick_with_warn, ban_with_warn FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
-          result_number = cursor.fetchone()
+          self.cursor.execute("SELECT warn, mute_with_warn, kick_with_warn, ban_with_warn FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
+          result_number = self.cursor.fetchone()
           
           embed = GOOD_USE(f"L'utilisateur {member} a été warn ! :information_source: `warn-help`", color=0xffc900)
           
@@ -125,14 +123,14 @@ Let's go !""")
               except: pass
               else:
                 embed.add_field(name=f"{warn_to_be_ban} warn", value="Ban")
-                cursor.execute("UPDATE ABC_warn SET ban_with_warn = ? WHERE guild_id = ? AND user_id = ?", (ban_number+1, guild_id, user_id))
+                self.cursor.execute("UPDATE ABC_warn SET ban_with_warn = ? WHERE guild_id = ? AND user_id = ?", (ban_number+1, guild_id, user_id))
 
             elif warn_total == warn_to_be_kick and warn_to_be_kick != 0:
               try: await member.kick(reason=f"{warn_total} Warn")
               except: pass
               else:
                 embed.add_field(name=f"{warn_to_be_kick} warn", value="Kick")
-                cursor.execute("UPDATE ABC_warn SET kick_with_warn = ? WHERE guild_id = ? AND user_id = ?", (kick_number+1, guild_id, user_id))
+                self.cursor.execute("UPDATE ABC_warn SET kick_with_warn = ? WHERE guild_id = ? AND user_id = ?", (kick_number+1, guild_id, user_id))
                 
             elif warn_total == warn_to_be_mute and warn_to_be_mute != 0:
               muted = discord.utils.get(ctx.guild.roles, name="muted") or discord.utils.get(ctx.guild.roles, name="Muted")
@@ -144,9 +142,9 @@ Let's go !""")
                   embed.add_field(name=f"{warn_to_be_mute} warn", value="Mute for 12 hours")
                   await ctx.send(embed=embed)
                   
-                  cursor.execute("UPDATE ABC_warn SET mute_with_warn = ? WHERE guild_id = ? AND user_id = ?", (mute_number+1, guild_id, user_id))
-                  con.commit() # commit ici pour pas attendre la fin du mute pour commit...
-                  con.close() # close ici sinon le sleep va bloqué l'accès a la db
+                  self.cursor.execute("UPDATE ABC_warn SET mute_with_warn = ? WHERE guild_id = ? AND user_id = ?", (mute_number+1, guild_id, user_id))
+                  self.con.commit() # commit ici pour pas attendre la fin du mute pour commit...
+                  #self.con.close() # close ici sinon le sleep va bloqué l'accès a la db
                   
                   await asyncio.sleep(43200) # 12 hours
                   await member.remove_roles(muted)
@@ -157,12 +155,10 @@ Let's go !""")
           await ctx.send(embed=embed)
           
       except Exception as e:
-          await ctx.send(str(type(e)) + str(e))
-          con.rollback()
+          self.con.rollback()
 
       else:
-          con.commit()
-          con.close() # commit plus haut
+          self.con.commit()
 
   @commands.has_permissions(manage_messages=True)
   @commands.command()
@@ -170,108 +166,90 @@ Let's go !""")
       if not await Warn.check_role(ctx, member, "unwarn"): return
     
       try:
-          con = sqlite3.connect(self.DB)
-          cursor = con.cursor()
           user_id = member.id
           guild_id = ctx.guild.id
 
-          cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
-          result = cursor.fetchone()
+          self.cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
+          result = self.cursor.fetchone()
 
           if result is None: # si user pas inscrit dans la bdd ou si il n'a aucun warn (<= pour verif)
               await ctx.send(embed=discord.Embed(title=f"{member} n'a aucun warn !"))
               return
           else:
               if result[2] == 1: # si il a 1 warn et qu'on fait cette commande /unwarn, il est suppr de la db
-                  cursor.execute("SELECT * FROM ABC_warn WHERE user_id = ? AND warn = ?", (user_id, 1))
-                  cursor.execute("DELETE FROM ABC_warn WHERE user_id = ? AND warn = ?", (user_id, 1)) # a corriger
+                  self.cursor.execute("SELECT * FROM ABC_warn WHERE user_id = ? AND warn = ?", (user_id, 1))
+                  self.cursor.execute("DELETE FROM ABC_warn WHERE user_id = ? AND warn = ?", (user_id, 1)) # a corriger
 
               else:
-                  cursor.execute("UPDATE ABC_warn SET warn = ? WHERE guild_id = ? AND user_id = ?", (result[2]-1, guild_id, user_id))
+                  self.cursor.execute("UPDATE ABC_warn SET warn = ? WHERE guild_id = ? AND user_id = ?", (result[2]-1, guild_id, user_id))
 
 
           await ctx.send(embed=GOOD_USE(f"L'utilisateur {member} a été unwarn ! :information_source: `warn-help`", color=0xffc900))
 
 
       except Exception as e:
-          await ctx.send(str(type(e)) + str(e))
-          con.rollback()
+          self.con.rollback()
 
       else:
-          con.commit()
-          con.close()
+          self.con.commit()
   
   @commands.has_permissions(administrator=True)
   @commands.command(name="warn-clear", aliases=["clear-warn"])
   async def clear_warn(ctx):
     try:
-      con = sqlite3.connect(self.DB)
-      cursor = con.cursor()
       guild_id = ctx.guild.id
 
-      cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ?", (guild_id, ))
-      result = cursor.fetchone() or await ctx.send(embed=ERROR(f"Aucun warn n'a été donné sur le serveur !"))
+      self.cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ?", (guild_id, ))
+      result = self.cursor.fetchone() or await ctx.send(embed=ERROR(f"Aucun warn n'a été donné sur le serveur !"))
 
-      cursor.execute("DELETE FROM ABC_warn WHERE guild_id = ?", (guild_id, ))
+      self.cursor.execute("DELETE FROM ABC_warn WHERE guild_id = ?", (guild_id, ))
       
       await ctx.send(embed=GOOD_USE("Il n'y a plus aucun warn sur le serveur"))
 
 
     except Exception as e:
       await ctx.send(str(type(e)) + str(e))
-      con.rollback()
+      self.con.rollback()
 
     else:
-      con.commit()
-      con.close()
+      self.con.commit()
     
 
 
   @commands.has_permissions(manage_messages=True)
   @commands.command()
   async def checkwarn(self, ctx, member:discord.Member):
-      try:
-          con = sqlite3.connect(self.DB)
-          cursor = con.cursor()
-          user_id = member.id
-          guild_id = ctx.guild.id
+      user_id = member.id
+      guild_id = ctx.guild.id
 
-          cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
-          result = cursor.fetchone()
+      self.cursor.execute("SELECT * FROM ABC_warn WHERE guild_id = ? AND user_id = ?", (guild_id, user_id))
+      result = self.cursor.fetchone()
 
-          if result is None: # si il n'est pas dans la bdd
-              # simulation de la bdd
-              embed=discord.Embed(title=f"Warn de {ctx.guild.get_member(member.id)} ({member.id})")
-              embed.add_field(name="WARNS", value="0", inline=False)
-              embed.add_field(name="Mute with warn", value="0", inline=False)
-              embed.add_field(name="Kick with warn", value="0", inline=False)
-              embed.add_field(name="Ban with warn", value="0", inline=False)
-              
-          else:
-              embed = discord.Embed(title=f"Warn de {ctx.guild.get_member(result[1])} ({result[1]})")
-              embed.add_field(name="WARNS", value=result[2], inline=False)
-              embed.add_field(name="Mute with warn", value=result[3], inline=False)
-              embed.add_field(name="Kick with warn", value=result[4], inline=False)
-              embed.add_field(name="Ban with warn", value=result[5], inline=False)
-
-          await ctx.send(embed=embed)
-      except Exception as e:
-          await ctx.send(str(type(e)) + str(e))
-          con.rollback()
-
+      if result is None: # si il n'est pas dans la bdd
+          # simulation de la bdd
+          embed=discord.Embed(title=f"Warn de {ctx.guild.get_member(member.id)} ({member.id})")
+          embed.add_field(name="WARNS", value="0", inline=False)
+          embed.add_field(name="Mute with warn", value="0", inline=False)
+          embed.add_field(name="Kick with warn", value="0", inline=False)
+          embed.add_field(name="Ban with warn", value="0", inline=False)
+          
       else:
-          con.close()
+          embed = discord.Embed(title=f"Warn de {ctx.guild.get_member(result[1])} ({result[1]})")
+          embed.add_field(name="WARNS", value=result[2], inline=False)
+          embed.add_field(name="Mute with warn", value=result[3], inline=False)
+          embed.add_field(name="Kick with warn", value=result[4], inline=False)
+          embed.add_field(name="Ban with warn", value=result[5], inline=False)
+
+      await ctx.send(embed=embed)
 
 
   @commands.command(name="warn-list")
   async def checkallwarn(self, ctx):
       try:
-          con = sqlite3.connect(self.DB)
-          cursor = con.cursor()
           guild_id = ctx.guild.id
 
-          cursor.execute("SELECT user_id, warn FROM ABC_warn WHERE guild_id = ?", (guild_id, ))
-          result = cursor.fetchall()
+          self.cursor.execute("SELECT user_id, warn FROM ABC_warn WHERE guild_id = ?", (guild_id, ))
+          result = self.cursor.fetchall()
           # example : [('Ember#3398', 418154142175854613, 1), ('ZedRoff#6268', 327074335238127616, 4)]
 
 
@@ -284,13 +262,10 @@ Let's go !""")
           await ctx.send(embed=embed)
 
       except Exception as e:
-          await ctx.send(str(type(e)) + str(e))
-          con.rollback()
-
-      else:
-          con.close()
-          
+          print(str(type(e)) + str(e))
+          self.con.rollback()
   
 
 def setup(bot):
-    bot.add_cog(Warn(bot))
+    from ..cmd_main import con, cursor
+    bot.add_cog(Warn(bot, con, cursor))
