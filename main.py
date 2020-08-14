@@ -52,9 +52,27 @@ OWNER_ID = (EMBER_ID, ZED_ID)
 
 @bot.event
 async def on_message(message):
-    if message.author.bot or message.channel.__class__ == discord.DMChannel:
-        return
-    await bot.process_commands(message)
+  if message.author.bot or message.channel.__class__ == discord.DMChannel:
+    return
+
+  try:
+    content = message.content.split()[0]
+  except:
+    return
+
+  for command in bot.commands:
+    command_name = ["!"+command.name] + ["!"+alias for alias in command.aliases]
+
+    if content in command_name:
+      con = sqlite3.connect(r"data/data.db")
+      cursor = con.cursor()
+
+      cursor.execute("SELECT command_name FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (message.guild.id, command.name))
+      result = cursor.fetchone()
+
+      if result is None:
+        await bot.process_commands(message)
+
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -123,6 +141,53 @@ async def on_ready():
     else:
         print('0 error occured in `on_ready`, go go go')
 
+
+
+@bot.command()
+async def enable(ctx, command_name):
+    for command in bot.commands:
+        # one case
+        if command.name == command_name or command_name in command.aliases:
+            con = sqlite3.connect("data/data.db")
+            cursor = con.cursor()
+
+            cursor.execute("SELECT command_name FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (ctx.guild.id, command.name))
+            result = cursor.fetchone()
+            if result is None:
+                return await ctx.send("This command is already enable")
+
+            cursor.execute("DELETE FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (ctx.guild.id, command.name))
+            con.commit()
+            await ctx.send("The command is now enable")
+
+            return
+
+    await ctx.send("This command does not exist.")
+
+
+@bot.command()
+async def disable(ctx, command_name):
+    if command_name in ["enable", "disable"]:
+        return await ctx.send("You can't disable `disable`, `enable` commands.")
+
+    for command in bot.commands:
+        # one case
+        if command.name == command_name or command_name in command.aliases:
+            con = sqlite3.connect("data/data.db")
+            cursor = con.cursor()
+
+            cursor.execute("SELECT command_name FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (ctx.guild.id, command.name))
+            result = cursor.fetchone()
+            if result is not None:
+                return await ctx.send("This command is already disable")
+
+            cursor.execute("INSERT INTO zel_toggle VALUES(?, ?)", (ctx.guild.id, command.name))
+            con.commit()
+            await ctx.send("The command is now disable")
+
+            return
+
+    await ctx.send("This command does not exist.")
 
 
 
