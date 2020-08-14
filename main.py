@@ -13,37 +13,53 @@ load_dotenv()
 TOKEN = os.environ["TOKEN"]
 
 
-custom_prefixes = {}
+""" GET PREFIX """
 default_prefix = ['/']
 
-async def _prefix(bot, message):
+async def cmd_prefix(bot, message):
     if message.guild:
-        # sur un serveur, préfix custom
-        # cursor.execute("SELECT prefix FROM ABC_prefix WHERE guild_id = ?", (message.guild.id, ))
-        # return cursor.fetchone()[0] # ("!", )
-        return custom_prefixes.get(message.guild.id, default_prefix)
+      # sur un serveur, préfix custom
+      con = sqlite3.connect("data.db")
+      cursor = con.cursor()
+      cursor.execute("SELECT prefix FROM zel_prefix WHERE prefix_guild_id = ?", (message.guild.id, ))
+      prefix = cursor.fetchone() # ("!", )
+
+      return default_prefix if prefix is None else prefix[0]
+
     else:
-        # en MP, préfix par défaut !
-        return default_prefix
+      # en MP, préfix par défaut !
+      return default_prefix
 
-
-# Initialisation du bot
-bot = commands.Bot(command_prefix=_prefix) # 3 shard (0, 1, 2)
+# Initialize bot
+bot = commands.Bot(command_prefix=cmd_prefix)
 bot.remove_command("help")
 
-
+""" PREFIX COMMAND """
 @bot.command()
 @commands.guild_only()
-async def setprefix(ctx, *, prefixes):
-    # guild_id = ctx.guild.id
-    # cursor.execute("SELECT prefix FROM ABC_prefix WHERE guild_id = ?", ctx.guild.id)
-    # result = cursor.fetchone()
-    #if result is None:
-    #cursor.execute("INSERT INTO ABC_prefix VALUES(?, ?)", (guild_id, prefixes))
-    #else:
-    #cursor.execute("UPDATE ABC_users SET prefix = ? WHERE guild_id = ?", (prefixes, guild_id))
-    custom_prefixes[ctx.guild.id] = prefixes.split() or default_prefix # le "or" évite la condition "if not prefix" si le préfix n'est pas renseigné
-    await ctx.send("Préfix bien set !")
+async def prefix(ctx, prefix=None):
+  if prefix is None:
+      return await ctx.send(embed=discord.Embed(title=f"Prefix on this server is {bot.command_prefix(bot, ctx.message)}"))
+  
+  # first argument in case if a user type /prefix "lol d do ifnjef", prefix will be lol
+  prefix = prefix.split()[0]
+  
+  if len(prefix) > 5:
+          return await ctx.send(f"Prefix `{prefix}` too big (5 char maximum)")
+
+  con = sqlite3.connect("data.db")
+  cursor = con.cursor()
+  
+  guild_id = ctx.guild.id
+  cursor.execute("SELECT prefix FROM zel_prefix WHERE prefix_guild_id = ?", (guild_id, ))
+  result = cursor.fetchone()
+  
+  if result is None:
+    cursor.execute("INSERT INTO zel_prefix VALUES(?, ?)", (guild_id, prefix))
+  else:
+    cursor.execute("UPDATE zel_prefix SET prefix = ? WHERE prefix_guild_id = ?", (prefix, guild_id))
+  con.commit()
+
 
 EMBER_ID = 418154142175854613
 ZED_ID = 327074335238127616
@@ -52,27 +68,9 @@ OWNER_ID = (EMBER_ID, ZED_ID)
 
 @bot.event
 async def on_message(message):
-  if message.author.bot or message.channel.__class__ == discord.DMChannel:
-    return
-
-  try:
-    content = message.content.split()[0]
-  except:
-    return
-
-  for command in bot.commands:
-    command_name = ["!"+command.name] + ["!"+alias for alias in command.aliases]
-
-    if content in command_name:
-      con = sqlite3.connect(r"data/data.db")
-      cursor = con.cursor()
-
-      cursor.execute("SELECT command_name FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (message.guild.id, command.name))
-      result = cursor.fetchone()
-
-      if result is None:
-        await bot.process_commands(message)
-
+    if message.author.bot or message.channel.__class__ == discord.DMChannel:
+        return
+    await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -141,53 +139,6 @@ async def on_ready():
     else:
         print('0 error occured in `on_ready`, go go go')
 
-
-
-@bot.command()
-async def enable(ctx, command_name):
-    for command in bot.commands:
-        # one case
-        if command.name == command_name or command_name in command.aliases:
-            con = sqlite3.connect("data/data.db")
-            cursor = con.cursor()
-
-            cursor.execute("SELECT command_name FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (ctx.guild.id, command.name))
-            result = cursor.fetchone()
-            if result is None:
-                return await ctx.send("This command is already enable")
-
-            cursor.execute("DELETE FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (ctx.guild.id, command.name))
-            con.commit()
-            await ctx.send("The command is now enable")
-
-            return
-
-    await ctx.send("This command does not exist.")
-
-
-@bot.command()
-async def disable(ctx, command_name):
-    if command_name in ["enable", "disable"]:
-        return await ctx.send("You can't disable `disable`, `enable` commands.")
-
-    for command in bot.commands:
-        # one case
-        if command.name == command_name or command_name in command.aliases:
-            con = sqlite3.connect("data/data.db")
-            cursor = con.cursor()
-
-            cursor.execute("SELECT command_name FROM zel_toggle WHERE guild_id = ? AND command_name = ?", (ctx.guild.id, command.name))
-            result = cursor.fetchone()
-            if result is not None:
-                return await ctx.send("This command is already disable")
-
-            cursor.execute("INSERT INTO zel_toggle VALUES(?, ?)", (ctx.guild.id, command.name))
-            con.commit()
-            await ctx.send("The command is now disable")
-
-            return
-
-    await ctx.send("This command does not exist.")
 
 
 
