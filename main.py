@@ -140,12 +140,15 @@ if __name__ == "__main__": # SI c'est ce fichier qui est lancé seulement !
     from command.fun.dog import dog
     from command.fun.roll import roll
 
-    from command.utils.color import color
+    from command.utils.color import color, rgb, hexa
     from command.utils.find import find
     from command.utils.lmgtfy import lmgtfy
     from command.utils.qrcode import qrcode
     from command.utils.say import say
     from command.utils.timer import timer
+    from command.utils.length import length, lengthword
+    from command.utils.hastebin import hastebin
+    from command.utils.b64cmd import b64encode, b64decode
 
     from command.information.help import help_command
 
@@ -165,20 +168,17 @@ if __name__ == "__main__": # SI c'est ce fichier qui est lancé seulement !
     from command.moderation.role_remove import removerole
     from command.moderation.slowmode import slowmode
 
-    from command.owner.eval import _eval
-
     for command in [
         ball8, bingo, cat, dog, roll, 
-        color, find, lmgtfy, qrcode, say, timer, help_command, 
+        color, find, lmgtfy, qrcode, say, timer, help_command, length, lengthword, hastebin, b64encode, b64decode, rgb, hexa,
         ban, unban, create_channel, delete_channel, clear, kick, lock, unlock, mute, unmute, nickbot, rename,
-        rename_prefix, addrole, create_role, delete_role, removerole, slowmode,
-        _eval]:
+        rename_prefix, addrole, create_role, delete_role, removerole, slowmode,]:
     
         bot.add_command(command)
 
     extensions = [
         'command.modules.ticket', 'command.modules.warn', 'command.modules.blacklist',
-        'command.information.informations', 'command.information.informations_bot'
+        'command.information.informations', 'command.information.informations_bot', 'command.owner', 
     ]
 
     for extension in extensions:
