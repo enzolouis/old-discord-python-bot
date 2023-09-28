@@ -3,7 +3,8 @@ import discord
 
 from discord.ext import commands
 from datetime import datetime
- 
+
+from ..error import CtxEmbed
 
 class BotInformations(commands.Cog):
     def __init__(self, bot):
@@ -22,7 +23,7 @@ class BotInformations(commands.Cog):
         embed.add_field(name="➔ ID", value=ctx.bot.user.id)
         embed.add_field(name="➔ Servers", value=len(ctx.bot.guilds))
         embed.add_field(name="➔ Users", value=len(ctx.bot.users))
-        embed.set_thumbnail(url=ctx.bot.user.avatar_url)
+        embed.set_thumbnail(url=ctx.bot.user.avatar)
 
         await ctx.send(embed=embed)
 
@@ -51,8 +52,8 @@ class BotInformations(commands.Cog):
 
         embed = discord.Embed()
 
-        embed.description = f"➔ [CLIQUE HERE]({self.support_url}) if you want to join support ! \
-\n\n➔ [CLIQUE HERE]({invite}) if you want to invite the bot !"
+        embed.description = f"➔ [CLICK HERE]({self.support_url}) if you want to join support ! \
+\n\n➔ [CLICK HERE]({invite}) if you want to invite the bot !"
 
         embed.set_thumbnail(url="https://lh3.googleusercontent.com/pvhOimTtaDL-1YFGLmMoxa3_aBHEObk9B7VJntEC4lkeqwqNuBYWom7uW8Mb-AzeByU")
         
@@ -62,6 +63,9 @@ class BotInformations(commands.Cog):
     async def invite(self, ctx):
         await self.support(ctx)
 
+    @commands.command(aliases=["report"], brief="Report a problem with the bot, or suggestion, or ... as you want :D")
+    async def feedback(self, ctx, message):
+        await self.bot.get_channel(762014696504557581).send(embed=CtxEmbed(ctx, description=message))
 
     @commands.command()
     async def news(self, ctx):
@@ -75,5 +79,5 @@ class BotInformations(commands.Cog):
         await ctx.send(embed=embed)
 
 
-def setup(bot):
-    bot.add_cog(BotInformations(bot))
+async def setup(bot):
+    await bot.add_cog(BotInformations(bot))

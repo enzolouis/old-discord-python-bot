@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 
 
-@commands.command()
+@commands.command(brief="Summon a timer between infinity to 0")
 async def timer(ctx, *, start:int):
   if start < 1:
     await ctx.send("**Please type a `number` < 0**")

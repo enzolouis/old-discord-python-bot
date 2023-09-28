@@ -6,7 +6,7 @@ from discord.ext import commands
 
 from ..error import ERROR
 
-@commands.command()
+@commands.command(brief="Generate a qrcode picture with a text you choice")
 async def qrcode(ctx, *, message):
   try:
     url = pyqrcode.create(message)

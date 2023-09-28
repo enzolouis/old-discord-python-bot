@@ -5,7 +5,7 @@ from discord.ext import commands
 
 from ..error import ERROR
 
-@commands.command()
+@commands.command(brief="Generate a hastebin on https://hastebin.com with your text")
 @commands.cooldown(1, 60)
 async def hastebin(ctx, *, body):
     async with aiohttp.ClientSession() as session:

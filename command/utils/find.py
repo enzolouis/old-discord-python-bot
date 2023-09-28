@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 
 
-@commands.command()
+@commands.command(brief="Find some users with their name and discriminator")
 async def find(ctx, user):
   embed = discord.Embed()
   user_find_with_name = []

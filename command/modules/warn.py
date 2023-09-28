@@ -133,22 +133,26 @@ Let's go !""")
                 self.cursor.execute("UPDATE ABC_warn SET kick_with_warn = ? WHERE guild_id = ? AND user_id = ?", (kick_number+1, guild_id, user_id))
                 
             elif warn_total == warn_to_be_mute and warn_to_be_mute != 0:
-              muted = discord.utils.get(ctx.guild.roles, name="muted") or discord.utils.get(ctx.guild.roles, name="Muted")
+              for x in ctx.guild.text_channels:
+                if x.permissions_for(member).send_messages:
+                  await x.set_permissions(member, overwrite=discord.PermissionOverwrite(send_messages=False, read_messages=x.permissions_for(member).read_messages))
+
               
-              if muted is not None:
-                try: await member.add_roles(muted, reason=f"{warn_total} Warn")
-                except Exception as e: await ctx.send(e)
-                else:
-                  embed.add_field(name=f"{warn_to_be_mute} warn", value="Mute for 12 hours")
-                  await ctx.send(embed=embed)
-                  
-                  self.cursor.execute("UPDATE ABC_warn SET mute_with_warn = ? WHERE guild_id = ? AND user_id = ?", (mute_number+1, guild_id, user_id))
-                  self.con.commit() # commit ici pour pas attendre la fin du mute pour commit...
-                  #self.con.close() # close ici sinon le sleep va bloqué l'accès a la db
-                  
-                  await asyncio.sleep(43200) # 12 hours
-                  await member.remove_roles(muted)
-                  return # return pour pas continuer et re .close et re .commit et ré envoyer l'embed
+              embed.add_field(name=f"{warn_to_be_mute} warn", value="Mute for 12 hours")
+              await ctx.send(embed=embed)
+              
+              self.cursor.execute("UPDATE ABC_warn SET mute_with_warn = ? WHERE guild_id = ? AND user_id = ?", (mute_number+1, guild_id, user_id))
+              self.con.commit() # commit ici pour pas attendre la fin du mute pour commit...
+              #self.con.close() # close ici sinon le sleep va bloqué l'accès a la db
+              
+              await asyncio.sleep(43200) # 12 hours
+              
+              for x in ctx.guild.text_channels:
+                if not x.permissions_for(member).send_messages:
+                  await x.set_permissions(member, overwrite=None)
+
+
+              return # return pour pas continuer et re .close et re .commit et ré envoyer l'embed
                   
           
           # dans tous les cas
@@ -195,7 +199,8 @@ Let's go !""")
   
   @commands.has_permissions(administrator=True)
   @commands.command(name="warn-clear", aliases=["clear-warn"])
-  async def clear_warn(ctx):
+  async def clear_warn(self, ctx):
+    # test
     try:
       guild_id = ctx.guild.id
 
@@ -218,7 +223,7 @@ Let's go !""")
 
   @commands.has_permissions(manage_messages=True)
   @commands.command()
-  async def checkwarn(self, ctx, member:discord.Member):
+  async def warns(self, ctx, member:discord.Member):
       user_id = member.id
       guild_id = ctx.guild.id
 
@@ -266,6 +271,6 @@ Let's go !""")
           self.con.rollback()
   
 
-def setup(bot):
+async def setup(bot):
     from ..cmd_main import con, cursor
-    bot.add_cog(Warn(bot, con, cursor))
+    await bot.add_cog(Warn(bot, con, cursor))

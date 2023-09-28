@@ -1,33 +1,63 @@
-import discord
-from discord.ext import commands
-import inspect
+import typing
+import asyncio
 import io
-import textwrap
 import traceback
+import aiohttp
 import os
 import sys
-
-from contextlib import redirect_stdout
-
-def check(ctx):
-    return ctx.author.id == 418154142175854613
-
+import discord
 import time
+
 from datetime import timedelta
-launch = time.monotonic()
+from textwrap import indent
+from contextlib import redirect_stdout
+from discord.ext import commands
 
 
-# rendre hidden chacunes des commandes de ce fichier dans le help (hidden=True)
+owner_id = (418154142175854613, 327074335238127616, 684117553974345730, 538056220200796162) # ember, zedroff, doduo
 
-class Owner(commands.Cog):
+
+class Eval(commands.Cog):
+    """
+    Evaluate your code asynchronously with bot action like create channel, ...
+    You can return an object, if this object is not None surely, you will have (with your output) 
+    the return description with the object, his type, lenght, and dir
+    """
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.check(check)
-    @commands.command(name='eval')
-    async def _eval(self, ctx, *, body):
-        """Evaluates python code"""
+    async def cog_check(self, ctx):
+        return ctx.author.id in owner_id
+
+    @staticmethod
+    def py(text):
+        """ Format text to a python markdown """
+        return f"```py\n{text}\n```"
+
+
+    async def wait_until_react(self, ctx, msg):
+        """ Add reaction :boom: to the return value, if the author click on, the return will be deleted """
+        await msg.add_reaction("\N{COLLISION SYMBOL}")
+
+        def check(react, author):
+            return author == ctx.author and str(react.emoji) == "\N{COLLISION SYMBOL}" and react.message.id == msg.id
         
+        try:
+            react = await self.bot.wait_for("reaction_add", check=check, timeout=60)
+        except asyncio.TimeoutError:
+            await msg.clear_reactions()
+        else:
+            await msg.delete()
+
+
+    @commands.command(name="eval", hidden=True)
+    async def _eval(self, ctx, *, code): # _eval to don't bloc eval() builtin function
+        "Try your python codes directly on discord"
+        # :white_check_mark: and :x: in discord
+        tick = "\N{WHITE HEAVY CHECK MARK}" # unicode : "\u2049"
+        error = "\N{CROSS MARK}" # unicode : "\u2705"
+
+        py = Eval.py # quickly
 
         env = {
             "ctx": ctx,
@@ -35,105 +65,93 @@ class Owner(commands.Cog):
             "author": ctx.author,
             "guild": ctx.guild,
             "message": ctx.message,
-            "source": inspect.getsource,
             "bot":self.bot,
-            "command":ctx.command,
-
         }
 
-        env.update(globals())
+        env.update(globals()) # push `env` dictionnary to the globals() builtin dictionnary
 
-        body = self._cleanup_code(body)
-        stdout = io.StringIO()
-        err = out = None
 
-        to_compile = f'async def func():\n{textwrap.indent(body, "  ")}'
 
-        def paginate(text: str):
-            '''Simple generator that paginates text.'''
-            last = 0
-            pages = []
-            for curr in range(0, len(text)):
-                if curr % 1980 == 0:
-                    pages.append(text[last:curr])
-                    last = curr
-                    appd_index = curr
-            if appd_index != len(text) - 1:
-                pages.append(text[last:curr])
-            return list(filter(lambda a: a != '', pages))
+        buffer = io.StringIO()
+
+        # create asynchrnous fonction environment to execute await instruction.
+        async_code = f"async def func():\n{indent(code, '    ')}"
+        # using textwrap :
+        # async def func():
+        #    code
+        #    code
+        # not using textwrap :
+        # async def fucn():
+        # code
+        # code
+        # INVALID SYNTAX
 
         try:
-            to_compile_split = to_compile.split("\n")
-            def exec_code():
-                exec(to_compile, env)
+            with redirect_stdout(buffer): # SURELY OPTIONNAL BUT SAFE | redirect only stdout and don't send in console, only in discord
+                exec(async_code, env) # exec async code with env, in order to have an acces  to variable like ctx, bot, ... (see `env` var)
 
-            if len(to_compile_split) == 2:
-                try:
-                    await ctx.send(f"`{eval(to_compile_split[1], env)}`")
-                except Exception as e:
-                    exec_code()
-                else:
-                    exec_code()
-            else:
-                exec_code()
-            
-        except Exception as e:
-            err = await ctx.send(f'```py\n{e.__class__.__name__}: {e}\n```')
-            return await ctx.message.add_reaction('\u2049')
+        except Exception as e: # catch invalid syntax
+            msg = await ctx.send(py(f"{e.__class__.__name__}: {e}"))
+            await ctx.message.add_reaction(error)
+            return await self.wait_until_react(ctx, msg) # even if error happen, :boom: react must be here
 
-        func = env['func']
+        func = env['func'] # get func from env. func is in env at this line : exec(code, env)
         try:
-            with redirect_stdout(stdout):
-                ret = await func()
+            with redirect_stdout(buffer): # redirect only stdout and don't send in console, only in discord
+                return_ = await func()
         except Exception as e:
-            value = stdout.getvalue()
-            err = await ctx.send(f'```py\n{value}{traceback.format_exc()}\n```')
+            value = buffer.getvalue()
+            msg = await ctx.send(py(f"{value}{traceback.format_exc()}")) # traceback.format_exc to retrace context exception
+            await ctx.message.add_reaction(error)
+            return await self.wait_until_react(ctx, msg) # even if error happen, :boom: react must be here
+        
+        # if 0 error :
+
+        value = buffer.getvalue()
+
+        if return_ is None and not value:
+            return await ctx.message.add_reaction(tick)
+
+        to_send = ""
+
+        if value:
+            to_send = value
+        if return_ is not None:
+
+            to_send = to_send + f"\n\n<Return>\n{return_}\nlenght:{len(return_) if isinstance(return_, typing.Sequence) else len(str(return_))}\n\n<Return type>\n{return_.__class__.__name__}\n\n<Return dir>\n{dir(return_)}"
+        
+
+        if len(to_send) < 1980:
+            msg = await ctx.send(py(to_send))
+            await ctx.message.add_reaction(tick)
         else:
-            value = stdout.getvalue()
-            if ret is None:
-                if value:
-                    try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post("https://bin.drlazor.be/", data={"val":to_send}) as response:
+                    if response.status == 200: # si la requête est réussie
+                        # convert = await response.text()
+                        msg = await ctx.send(f"<{response.url}>")
+                    else:
+                        return await ctx.send("Problem with <http://bin.drlazor.be>...")
+        
+        await self.wait_until_react(ctx, msg)
 
-                        out = await ctx.send(f'```py\n{value}\n```')
-                    except:
-                        paginated_text = paginate(value)
-                        for page in paginated_text:
-                            if page == paginated_text[-1]:
-                                out = await ctx.send(f'```py\n{page}\n```')
-                                break
-                            await ctx.send(f'```py\n{page}\n```')
-            else:
-                try:
-                    out = await ctx.send(f'```py\n{value}{ret}\n```')
-                except:
-                    paginated_text = paginate(f"{value}{ret}")
-                    for page in paginated_text:
-                        if page == paginated_text[-1]:
-                            out = await ctx.send(f'```py\n{page}\n```')
-                            break
-                        await ctx.send(f'```py\n{page}\n```')
 
-        if out:
-            await ctx.message.add_reaction('\u2705')  # tick
-        elif err:
-            await ctx.message.add_reaction('\u2049')  # x
-        else:
-            await ctx.message.add_reaction('\u2705')
 
-    def _cleanup_code(self, content):
-        """Automatically removes code blocks from the code."""
-        # remove ```py\n```
-        if content.startswith('```') and content.endswith('```'):
-            return '\n'.join(content.split('\n')[1:-1])
 
-        # remove `foo`
-        return content.strip('` \n')
+# rendre hidden chacunes des commandes de ce fichier dans le help (hidden=True)
 
+class Owner(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.launch = time.monotonic()
+
+    async def cog_check(self, ctx):
+        return ctx.author.id in owner_id
 
     @commands.group()
     async def exa(self, ctx):
         if ctx.invoked_subcommand is None:
-            await ctx.send("Form : `exa` <command>\n__Commands__\n\n`reload`;`shutdown`;`avatar`")
+            await ctx.send("Form : `exa` <command>\n__Commands__\n\n`reload`;`shutdown`;`stats`")
 
     @commands.command()
     async def reload(self, ctx):
@@ -149,16 +167,17 @@ class Owner(commands.Cog):
     @commands.command()
     async def stats(self, ctx):
         embed = discord.Embed(title=self.bot.user.name)
-        embed.add_field(name="Last launch", value=timedelta(seconds=time.monotonic() - launch))
+        embed.add_field(name="Last launch", value=timedelta(seconds=time.monotonic() - self.launch))
         embed.add_field(name="Python version", value=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
         embed.add_field(name="discord.py version", value=discord.__version__)
         await ctx.send(embed=embed)
 
 
-def setup(bot):
+async def setup(bot):
     owner = Owner(bot)
     owner.exa.add_command(owner.reload)
     owner.exa.add_command(owner.shutdown)
     owner.exa.add_command(owner.stats)
 
-    bot.add_cog(owner)
+    await bot.add_cog(owner)
+    await bot.add_cog(Eval(bot))

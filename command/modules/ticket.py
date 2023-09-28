@@ -127,7 +127,7 @@ class Ticket(commands.Cog):
     if mode == "edit":
       # catch the category
       await ctx.send("**Entrez une catégorie ! (avec son nom ou son ID)**")
-      await ctx.send(f"Apercu de la liste des catgories :```fix\n{' - '.join([category.name for category in ctx.guild.categories])}```")
+      await ctx.send(f"Apercu de la liste des catgories :```fix\n{' - '.join([category.name for category in ctx.guild.categories]) if ctx.guild.categories else 'No category...'}```")
       def check(message):
         content = message.content.lower()
         categories = [x.name.lower() for x in ctx.guild.categories]
@@ -177,6 +177,13 @@ class Ticket(commands.Cog):
         con.rollback()
       else:
         con.commit()
+
+    elif mode == "remove":
+      if result is None:
+        return await ctx.send(embed=ERROR("Ticket module is not already configured"))
+      cursor.execute("DELETE FROM ABC_config_ticket WHERE guild_id = ?", (guild_id, ))
+      con.commit()
+      await ctx.send(embed=GOOD_USE("Ticket module is now not configured"))
     
     else:
       # dans tous les autres cas, on peut seulement voir la configuration sans edit
@@ -216,6 +223,7 @@ class Ticket(commands.Cog):
     await self.log(ctx.channel, ctx.author, "clear", reason)
       
   @commands.command(aliases=["open", "new"])
+  @commands.cooldown(1, 60, commands.BucketType.user)
   async def create(self, ctx, member:typing.Optional[discord.Member]=None, *, target="No reason"):
     
     
@@ -229,12 +237,13 @@ class Ticket(commands.Cog):
     user_id = ctx.author.id
     channel_id = ctx.channel.id
     
-    
-    cursor.execute("SELECT user_id, channel_id, subject FROM ABC_ticket_new WHERE channel_id = ?", (channel_id, ))
-    result = cursor.fetchone()
-    
     cursor.execute("SELECT category_id FROM ABC_config_ticket WHERE guild_id = ?", (guild_id, ))
-    ticket_config = cursor.fetchone()
+    ticket_config = cursor.fetchone() # 0 risque de None, car le /ticket (commands.group()) est appelé avant et vérifie si ca ne vaut pas None
+
+    category = ctx.guild.get_channel(ticket_config[0])
+
+    if category is None: # if category has been deleted
+      return await ctx.send(embed=ERROR("Ticket module is not configured"))
     
     
     user_ticket = member or ctx.author
@@ -252,10 +261,13 @@ class Ticket(commands.Cog):
     for role in ctx.guild.roles:
       if role.permissions.manage_messages or role.permissions.manage_channels or role.permissions.manage_roles:
         overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-
-    new_channel = await ctx.guild.create_text_channel(str(user_ticket), category=ctx.guild.get_channel(ticket_config[0]), overwrites=overwrites)
+    try:
+      new_channel = await ctx.guild.create_text_channel(str(user_ticket), category=category, overwrites=overwrites)
+    except:
+      return await ctx.send(embed=ERROR("I don't have the required permissions to create the channel."))
     embed=WARNING(f"{user_ticket.mention}\nNew ticket open\n`{close_command}`(admin) pour fermer le ticket.")
     embed.add_field(name="Author", value=f"{ctx.author}\n({ctx.author.id})")
+    await ctx.channel.send(f"Your ticket has been create : {new_channel.mention}")
     await new_channel.send(embed=embed)
     await new_channel.send(f">>> {target}")
     try:
@@ -326,7 +338,7 @@ class Ticket(commands.Cog):
   
   
 
-def setup(bot):
+async def setup(bot):
   tick = Ticket(bot)
   tick.ticket.add_command(tick.config)
   tick.ticket.add_command(tick.create)
@@ -334,4 +346,4 @@ def setup(bot):
   tick.ticket.add_command(tick.remove)
   tick.ticket.add_command(tick.admin)
   tick.ticket.add_command(tick.clear)
-  bot.add_cog(tick)
+  await bot.add_cog(tick)

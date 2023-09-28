@@ -162,10 +162,10 @@ class Blacklist(commands.Cog):
         
           
 
-def setup(bot):
+async def setup(bot):
   bl = Blacklist(bot)
   bl.blacklist.add_command(bl.verif)
   bl.blacklist.add_command(bl.report)
   bl.blacklist.add_command(bl.add)
   bl.blacklist.add_command(bl.remove)
-  bot.add_cog(bl)
+  await bot.add_cog(bl)
